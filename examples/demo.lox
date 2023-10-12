@@ -1,5 +1,6 @@
 class Doughnut {
   cook() {
+    // comment
     print "Fry until golden brown.";
   }
 }
@@ -11,4 +12,9 @@ class BostonCream < Doughnut {
   }
 }
 
+/*
+ * This is a
+ * /* multi-line comment. 
+ // irrelevant
+ */
 BostonCream().cook();

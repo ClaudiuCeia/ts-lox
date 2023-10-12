@@ -93,11 +93,8 @@ export class Scanner {
         );
         break;
       case "/":
-        if (this.match("/")) {
-          // A comment goes until the end of the line.
-          while (this.peek() !== "\n" && !this.isAtEnd()) {
-            this.advance();
-          }
+        if (this.peek() === "/" || this.peek() === "*") {
+          this.skipComment();
         } else {
           this.addToken(TokenType.SLASH);
         }
@@ -178,6 +175,26 @@ export class Scanner {
 
     const value = this.source.substring(this.start + 1, this.current - 1);
     this.addToken(TokenType.STRING, value);
+  }
+
+  private skipComment(): void {
+    if (this.match("/")) {
+      while (this.peek() !== "\n" && !this.isAtEnd()) {
+        this.advance();
+      }
+    } else if (this.match("*")) {
+      let prev = "";
+      while (!this.isAtEnd()) {
+        const c = this.advance();
+        if (prev === "*" && c === "/") {
+          break;
+        } 
+        if (c === "\n") {
+          this.line++;
+        }
+        prev = c;
+      }
+    }
   }
 
   private isDigit(c: string): boolean {

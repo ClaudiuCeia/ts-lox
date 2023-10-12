@@ -21,6 +21,8 @@ export enum TokenType {
   GREATER_EQUAL,
   LESS,
   LESS_EQUAL,
+  SLASH_STAR,
+  STAR_SLASH,
 
   // Literals.
   IDENTIFIER,
