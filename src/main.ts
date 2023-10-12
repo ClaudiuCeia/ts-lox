@@ -1,6 +1,9 @@
 import { Scanner } from "./Scanner.ts";
 import { Token } from "./Token.ts";
 import { TokenType } from "./TokenType.ts";
+import { Interpreter, RuntimeError } from "./ast/Interpreter.ts";
+import { Parser } from "./ast/Parser.ts";
+import { Resolver } from "./ast/Resolver.ts";
 
 if (Deno.args.length > 1) {
   console.error(`Usage: ${Deno.mainModule} [filename]`);
@@ -11,13 +14,21 @@ if (Deno.args.length > 1) {
   runPrompt();
 }
 
+const interpreter = new Interpreter();
+
 let hadError = false;
+let hadRuntimeError = false;
+
 async function runFile(path: string): Promise<void> {
   const data = await Deno.readFile(path);
   run(new TextDecoder("utf-8").decode(data));
 
   if (hadError) {
     Deno.exit(65);
+  }
+
+  if (hadRuntimeError) {
+    Deno.exit(70);
   }
 }
 
@@ -41,9 +52,20 @@ async function run(source: string): Promise<void> {
   const scanner = new Scanner(source);
   const tokens = scanner.scanTokens();
 
-  for (const token of tokens) {
-    console.log(token.toString());
+  const parser = new Parser(tokens);
+  const statements = parser.parse();
+
+  if (hadError) {
+    return;
   }
+
+  const resolver = new Resolver(interpreter);
+  resolver.resolve(statements);
+  if (hadError) {
+    return;
+  }
+  
+  interpreter.interpret(statements);
 }
 
 export function error(line: number, message: string): void;
@@ -59,6 +81,11 @@ export function error(tokenOrString: Token | number, message: string): void {
   } else {
     report(tokenOrString.line, ` at '${tokenOrString.lexeme}'`, message);
   }
+}
+
+export function runtimeError(error: RuntimeError): void {
+  console.error(`${error.message}\n[line ${error.token.line}]`);
+  hadRuntimeError = true;
 }
 
 function report(line: number, where: string, message: string): void {

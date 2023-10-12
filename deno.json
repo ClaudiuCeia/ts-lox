@@ -1,0 +1,6 @@
+{
+  "tasks": {
+    "run": "deno run --allow-read src/main.ts",
+    "gen": "deno run --allow-read --allow-write src/ast/generate.ts src/ast"
+  }
+}

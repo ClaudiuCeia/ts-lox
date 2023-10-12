@@ -1,10 +1,26 @@
-import { Binary, Expr, Grouping, Literal, Unary, Visitor } from "./Expr.ts";
+import { Binary, Expr, Grouping, Literal, Unary, ExprVisitor, Assign, Variable, Logical, Call } from "./Expr.ts";
 
-export class AstPrinter implements Visitor<string> {
+export class AstPrinter implements ExprVisitor<string> {
   public print(expr: Expr): string {
     return expr.accept(this);
   }
 
+  public visitCallExpr(expr: Call): string {
+    return this.parenthesize("call", expr.callee, ...expr.args);
+  }
+
+  public visitLogicalExpr(expr: Logical): string {
+    return this.parenthesize(expr.operator.lexeme, expr.left, expr.right);
+  }
+
+  public visitAssignExpr(expr: Assign): string {
+    return this.parenthesize(`= ${expr.name.lexeme}`, expr.value);
+  }
+
+  public visitVariableExpr(expr: Variable): string {
+    return expr.name.lexeme;
+  }
+  
   public visitBinaryExpr(expr: Binary): string {
     return this.parenthesize(expr.operator.lexeme, expr.left, expr.right);
   }
@@ -14,8 +30,11 @@ export class AstPrinter implements Visitor<string> {
   }
 
   public visitLiteralExpr(expr: Literal): string {
-    if (expr.value === null) return "nil";
-    return expr.value.toString();
+    if (expr.value === null) {
+      return "nil";
+    }
+
+    return expr.value!.toString();
   }
 
   public visitUnaryExpr(expr: Unary): string {

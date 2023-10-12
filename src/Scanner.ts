@@ -131,11 +131,7 @@ export class Scanner {
     return this.source.charAt(this.current++);
   }
 
-  private addToken(type: TokenType): void;
-  // deno-lint-ignore no-explicit-any
-  private addToken(type: TokenType, literal: any): void;
-  // deno-lint-ignore no-explicit-any
-  private addToken(type: TokenType, literal: any = null): void {
+  private addToken(type: TokenType, literal?: unknown): void {
     const text = this.source.substring(this.start, this.current);
     this.tokens.push(new Token(type, text, literal, this.line));
   }

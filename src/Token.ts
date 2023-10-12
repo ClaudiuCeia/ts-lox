@@ -4,8 +4,7 @@ export class Token {
   constructor(
     readonly type: TokenType,
     readonly lexeme: string,
-    // deno-lint-ignore no-explicit-any
-    readonly literal: any,
+    readonly literal: unknown,
     readonly line: number
   ) {}
 
