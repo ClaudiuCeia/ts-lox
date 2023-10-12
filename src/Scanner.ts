@@ -1,6 +1,6 @@
 import { Token } from "./Token.ts";
 import { TokenType } from "./TokenType.ts";
-import { error } from "./main.ts";
+import { Lox } from "./Lox.ts";
 
 const Keywords = new Map<string, TokenType>([
   ["and", TokenType.AND],
@@ -120,7 +120,7 @@ export class Scanner {
         } else if (this.isAlpha(c)) {
           this.identifier();
         } else {
-          error(this.line, "Unexpected character.");
+          Lox.error(this.line, "Unexpected character.");
         }
 
         break;
@@ -170,7 +170,7 @@ export class Scanner {
     }
 
     if (this.isAtEnd()) {
-      error(this.line, "Unterminated string.");
+      Lox.error(this.line, "Unterminated string.");
       return;
     }
 

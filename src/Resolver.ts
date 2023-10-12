@@ -1,21 +1,26 @@
-import { Token } from "../Token.ts";
-import { Stack } from "../core/Stack.ts";
-import { error } from "../main.ts";
+import { Token } from "./Token.ts";
+import { Stack } from "./core/Stack.ts";
+import { Lox } from "./Lox.ts";
 import {
   Assign,
   Binary,
   Call,
   Expr,
   ExprVisitor,
+  Get,
   Grouping,
   Literal,
   Logical,
+  Set,
+  Super,
+  This,
   Unary,
   Variable,
-} from "./Expr.ts";
+} from "./generated/Expr.ts";
 import { Interpreter } from "./Interpreter.ts";
 import {
   Block,
+  Class,
   Expression,
   Func,
   If,
@@ -25,16 +30,25 @@ import {
   StmtVisitor,
   Var,
   While,
-} from "./Stmt.ts";
+} from "./generated/Stmt.ts";
 
 enum FunctionType {
   NONE,
   FUNCTION,
+  INITIALIZER,
+  METHOD,
+}
+
+enum ClassType {
+  NONE,
+  CLASS,
+  SUBCLASS,
 }
 
 export class Resolver implements ExprVisitor<void>, StmtVisitor<void> {
   private scopes: Stack<Map<string, boolean>> = new Stack();
   private currentFunction = FunctionType.NONE;
+  private currentClass = ClassType.NONE;
 
   constructor(private readonly interpreter: Interpreter) {}
 
@@ -59,6 +73,67 @@ export class Resolver implements ExprVisitor<void>, StmtVisitor<void> {
 
   private endScope(): void {
     this.scopes.pop();
+  }
+
+  public visitClassStmt(stmt: Class): void {
+    const enclosingClass = this.currentClass;
+    this.currentClass = ClassType.CLASS;
+
+    this.declare(stmt.name);
+    this.define(stmt.name);
+
+    if (stmt.superclass !== null) {
+      if (stmt.name.lexeme === stmt.superclass.name.lexeme) {
+        Lox.error(stmt.superclass.name, "A class can't inherit from itself.");
+      }
+
+      this.currentClass = ClassType.SUBCLASS;
+      this.resolve(stmt.superclass);
+
+      this.beginScope();
+      this.scopes.peek().set("super", true);
+    }
+
+    this.beginScope();
+    this.scopes.peek().set("this", true);
+
+    for (const method of stmt.methods) {
+      const declaration =
+        method.name.lexeme === "init"
+          ? FunctionType.INITIALIZER
+          : FunctionType.METHOD;
+
+      this.resolveFunction(method, declaration);
+    }
+
+    if (stmt.superclass !== null) {
+      this.endScope();
+    }
+
+    this.currentClass = enclosingClass;
+    this.endScope();
+  }
+
+  public visitSuperExpr(expr: Super): void {
+    if (this.currentClass === ClassType.NONE) {
+      Lox.error(expr.keyword, "Can't use 'super' outside of a class.");
+    } else if (this.currentClass !== ClassType.SUBCLASS) {
+      Lox.error(
+        expr.keyword,
+        "Can't use 'super' in a class with no superclass."
+      );
+    }
+
+    this.resolveLocal(expr, expr.keyword);
+  }
+
+  public visitGetExpr(expr: Get): void {
+    this.resolve(expr.object);
+  }
+
+  public visitSetExpr(expr: Set): void {
+    this.resolve(expr.value);
+    this.resolve(expr.object);
   }
 
   public visitBlockStmt(stmt: Block): void {
@@ -92,10 +167,22 @@ export class Resolver implements ExprVisitor<void>, StmtVisitor<void> {
       this.scopes.length > 0 &&
       this.scopes.peek().get(expr.name.lexeme) === false
     ) {
-      error(expr.name, "Cannot read local variable in its own initializer.");
+      Lox.error(
+        expr.name,
+        "Cannot read local variable in its own initializer."
+      );
     }
 
     this.resolveLocal(expr, expr.name);
+  }
+
+  public visitThisExpr(expr: This): void {
+    if (this.currentClass === ClassType.NONE) {
+      Lox.error(expr.keyword, "Cannot use 'this' outside of a class.");
+      return;
+    }
+
+    this.resolveLocal(expr, expr.keyword);
   }
 
   public visitExpressionStmt(stmt: Expression): void {
@@ -116,10 +203,14 @@ export class Resolver implements ExprVisitor<void>, StmtVisitor<void> {
 
   public visitReturnStmt(stmt: Return): void {
     if (this.currentFunction === FunctionType.NONE) {
-      error(stmt.keyword, "Can't return from top-level code.");
+      Lox.error(stmt.keyword, "Can't return from top-level code.");
     }
 
     if (stmt.value !== null) {
+      if (this.currentFunction === FunctionType.INITIALIZER) {
+        Lox.error(stmt.keyword, "Can't return a value from an initializer.");
+      }
+
       this.resolve(stmt.value);
     }
   }
@@ -190,7 +281,10 @@ export class Resolver implements ExprVisitor<void>, StmtVisitor<void> {
 
     const scope = this.scopes.peek();
     if (scope.has(token.lexeme)) {
-      error(token, "Variable with this name already declared in this scope.");
+      Lox.error(
+        token,
+        "Variable with this name already declared in this scope."
+      );
     }
 
     scope.set(token.lexeme, false);

@@ -1,4 +1,4 @@
-import { Binary, Expr, Grouping, Literal, Unary, ExprVisitor, Assign, Variable, Logical, Call } from "./Expr.ts";
+/* import { Binary, Expr, Grouping, Literal, Unary, ExprVisitor, Assign, Variable, Logical, Call } from "./Expr.ts";
 
 export class AstPrinter implements ExprVisitor<string> {
   public print(expr: Expr): string {
@@ -50,3 +50,4 @@ export class AstPrinter implements ExprVisitor<string> {
     return result;
   }
 }
+ */

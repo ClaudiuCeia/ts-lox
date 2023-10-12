@@ -1,6 +1,6 @@
-import { Token } from "../Token.ts";
-import { TokenType } from "../TokenType.ts";
-import { runtimeError } from "../main.ts";
+import { Token } from "./Token.ts";
+import { TokenType } from "./TokenType.ts";
+import { Lox } from "./Lox.ts";
 import { Environment } from "./Environment.ts";
 import {
   Binary,
@@ -13,10 +13,17 @@ import {
   Assign,
   Logical,
   Call,
-} from "./Expr.ts";
+  Get,
+  Set,
+  This,
+  Super,
+} from "./generated/Expr.ts";
+import { LoxClass } from "./LoxClass.ts";
 import { LoxCallable, LoxFunction } from "./LoxFunction.ts";
+import { LoxInstance } from "./LoxInstance.ts";
 import {
   Block,
+  Class,
   Expression,
   Func,
   If,
@@ -26,7 +33,7 @@ import {
   StmtVisitor,
   Var,
   While,
-} from "./Stmt.ts";
+} from "./generated/Stmt.ts";
 
 export class RuntimeError extends Error {
   constructor(readonly token: Token, message: string) {
@@ -69,7 +76,7 @@ export class Interpreter implements ExprVisitor<unknown>, StmtVisitor<void> {
       }
     } catch (error) {
       if (error instanceof RuntimeError) {
-        runtimeError(error);
+        Lox.runtimeError(error);
       }
     }
   }
@@ -102,9 +109,55 @@ export class Interpreter implements ExprVisitor<unknown>, StmtVisitor<void> {
       for (const statement of statements) {
         this.execute(statement);
       }
+    } catch (error) {
+      if (error instanceof RuntimeError) {
+        Lox.runtimeError(error);
+      }
     } finally {
       this.environment = previous;
     }
+  }
+
+  public visitClassStmt(stmt: Class): void {
+    let superclass = null;
+    if (stmt.superclass !== null) {
+      superclass = this.evaluate(stmt.superclass);
+      if (!(superclass instanceof LoxClass)) {
+        throw new RuntimeError(
+          stmt.superclass.name,
+          "Superclass must be a class."
+        );
+      }
+    }
+
+    this.environment.define(stmt.name.lexeme, null);
+
+    if (stmt.superclass !== null) {
+      this.environment = new Environment(this.environment);
+      this.environment.define("super", superclass);
+    }
+
+    const methods = new Map<string, LoxFunction>();
+    for (const method of stmt.methods) {
+      const func = new LoxFunction(
+        method,
+        this.environment,
+        method.name.lexeme === "init"
+      );
+      methods.set(method.name.lexeme, func);
+    }
+
+    const klass = new LoxClass(stmt.name.lexeme, superclass, methods);
+
+    if (superclass !== null) {
+      this.environment = this.environment.enclosing!;
+    }
+
+    this.environment.assign(stmt.name, klass);
+  }
+
+  public visitThisExpr(expr: This): unknown {
+    return this.lookUpVariable(expr.keyword, expr);
   }
 
   public visitReturnStmt(stmt: Return): void {
@@ -117,8 +170,48 @@ export class Interpreter implements ExprVisitor<unknown>, StmtVisitor<void> {
   }
 
   public visitFuncStmt(stmt: Func): void {
-    const func = new LoxFunction(stmt, this.environment);
+    const func = new LoxFunction(stmt, this.environment, false);
     this.environment.define(stmt.name.lexeme, func);
+  }
+
+  public visitGetExpr(expr: Get): unknown {
+    const object = this.evaluate(expr.object);
+    if (object instanceof LoxInstance) {
+      return object.get(expr.name);
+    }
+
+    throw new RuntimeError(expr.name, "Only instances have properties.");
+  }
+
+  public visitSetExpr(expr: Set): unknown {
+    const object = this.evaluate(expr.object);
+
+    if (!(object instanceof LoxInstance)) {
+      throw new RuntimeError(expr.name, "Only instances have fields.");
+    }
+
+    const value = this.evaluate(expr.value);
+    object.set(expr.name, value);
+    return value;
+  }
+
+  public visitSuperExpr(expr: Super): unknown {
+    const distance = this.locals.get(expr)!;
+
+    // Ugly typecasting
+    const superclass = this.environment.getAt(distance, "super") as LoxClass;
+    const object = this.environment.getAt(distance - 1, "this") as LoxInstance;
+
+    const method = superclass.findMethod(expr.method.lexeme);
+
+    if (method === null) {
+      throw new RuntimeError(
+        expr.method,
+        `Undefined property '${expr.method.lexeme}'.`
+      );
+    }
+
+    return method.bind(object);
   }
 
   public visitIfStmt(stmt: If): void {
@@ -212,7 +305,6 @@ export class Interpreter implements ExprVisitor<unknown>, StmtVisitor<void> {
   }
 
   public visitVariableExpr(expr: Variable): unknown {
-    // return this.environment.get(expr.name);
     return this.lookUpVariable(expr.name, expr);
   }
 

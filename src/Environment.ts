@@ -1,4 +1,5 @@
-import { Token } from "../Token.ts";
+import { Token } from "./Token.ts";
+import { RuntimeError } from "./Interpreter.ts";
 
 export class Environment {
   private values = new Map<string, unknown>();
@@ -14,7 +15,7 @@ export class Environment {
       return this.enclosing.get(token);
     }
 
-    throw new Error(`Undefined variable '${token.lexeme}'.`);
+    throw new RuntimeError(token, `Undefined variable '${token.lexeme}'.`);
   }
 
   public define(name: string, value: unknown): void {
@@ -32,7 +33,7 @@ export class Environment {
       return;
     }
 
-    throw new Error(`Undefined variable '${token.lexeme}'.`);
+    throw new RuntimeError(token, `Undefined variable '${token.lexeme}'.`);
   }
 
   public getAt(distance: number, name: string): unknown {

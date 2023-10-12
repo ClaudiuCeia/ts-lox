@@ -1,13 +1,14 @@
-// Path: src/ast/generate.ts
+// Path: src/generate.ts
 // Automatically generated. Do not edit manually.
 import { Token } from "../Token.ts";
-import { Expr } from "./Expr.ts";
+import { Expr, Variable } from "./Expr.ts";
 
 export abstract class Stmt {
   abstract accept<R>(visitor: StmtVisitor<R>): R;
 }
 export interface StmtVisitor<R> {
   visitBlockStmt(stmt: Block): R;
+  visitClassStmt(stmt: Class): R;
   visitExpressionStmt(stmt: Expression): R;
   visitFuncStmt(stmt: Func): R;
   visitIfStmt(stmt: If): R;
@@ -26,6 +27,23 @@ export class Block extends Stmt {
 
     public accept<R>(visitor: StmtVisitor<R>): R {
       return visitor.visitBlockStmt(this);
+    }
+  }
+
+export class Class extends Stmt {
+    readonly name: Token;
+    readonly superclass: Variable | null;
+    readonly methods: Func[];
+
+    constructor(name: Token, superclass: Variable | null, methods: Func[]) {
+      super();
+      this.name = name;
+      this.superclass = superclass;
+      this.methods = methods;
+    }
+
+    public accept<R>(visitor: StmtVisitor<R>): R {
+      return visitor.visitClassStmt(this);
     }
   }
 

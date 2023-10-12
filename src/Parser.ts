@@ -1,8 +1,33 @@
-import { Token } from "../Token.ts";
-import { TokenType } from "../TokenType.ts";
-import { error } from "../main.ts";
-import { Assign, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable } from "./Expr.ts";
-import { Block, Expression, Func, If, Print, Return, Stmt, Var, While } from "./Stmt.ts";
+import { Token } from "./Token.ts";
+import { TokenType } from "./TokenType.ts";
+import { Lox } from "./Lox.ts";
+import {
+  Assign,
+  Binary,
+  Call,
+  Expr,
+  Get,
+  Grouping,
+  Literal,
+  Logical,
+  Unary,
+  Variable,
+  Set,
+  This,
+  Super,
+} from "./generated/Expr.ts";
+import {
+  Block,
+  Class,
+  Expression,
+  Func,
+  If,
+  Print,
+  Return,
+  Stmt,
+  Var,
+  While,
+} from "./generated/Stmt.ts";
 
 class ParseError extends Error {}
 
@@ -27,6 +52,9 @@ export class Parser {
 
   private declaration(): Stmt | null {
     try {
+      if (this.match(TokenType.CLASS)) {
+        return this.classDeclaration();
+      }
       if (this.match(TokenType.FUN)) {
         return this.function("function");
       }
@@ -40,11 +68,32 @@ export class Parser {
       if (error instanceof ParseError) {
         this.synchronize();
       }
-    } 
+    }
 
     return null;
   }
-  
+
+  private classDeclaration(): Stmt {
+    const name = this.consume(TokenType.IDENTIFIER, "Expect class name.");
+
+    let superclass = null;
+    if (this.match(TokenType.LESS)) {
+      this.consume(TokenType.IDENTIFIER, "Expect superclass name.");
+      superclass = new Variable(this.previous());
+    }
+
+    this.consume(TokenType.LEFT_BRACE, "Expect '{' before class body.");
+
+    const methods = [];
+    while (!this.check(TokenType.RIGHT_BRACE) && !this.isAtEnd()) {
+      methods.push(this.function("method"));
+    }
+
+    this.consume(TokenType.RIGHT_BRACE, "Expect '}' after class body.");
+
+    return new Class(name, superclass, methods);
+  }
+
   private varDeclaration(): Stmt {
     const name = this.consume(TokenType.IDENTIFIER, "Expect variable name.");
 
@@ -98,7 +147,7 @@ export class Parser {
 
     return new If(condition, thenBranch, elseBranch);
   }
-  
+
   private printStatement(): Stmt {
     const value = this.expression();
     this.consume(TokenType.SEMICOLON, "Expect ';' after value.");
@@ -155,7 +204,7 @@ export class Parser {
 
     return new While(condition, body);
   }
-  
+
   private expressionStatement(): Stmt {
     const expr = this.expression();
     this.consume(TokenType.SEMICOLON, "Expect ';' after expression.");
@@ -172,12 +221,12 @@ export class Parser {
     this.consume(TokenType.SEMICOLON, "Expect ';' after return value.");
     return new Return(keyword, value);
   }
-  
-  private function(kind: string): Stmt {
+
+  private function(kind: string): Func {
     const name = this.consume(TokenType.IDENTIFIER, `Expect ${kind} name.`);
 
     this.consume(TokenType.LEFT_PAREN, `Expect '(' after ${kind} name.`);
-    
+
     const parameters: Token[] = [];
     if (!this.check(TokenType.RIGHT_PAREN)) {
       do {
@@ -185,7 +234,9 @@ export class Parser {
           this.error(this.peek(), "Can't have more than 255 parameters.");
         }
 
-        parameters.push(this.consume(TokenType.IDENTIFIER, "Expect parameter name."));
+        parameters.push(
+          this.consume(TokenType.IDENTIFIER, "Expect parameter name.")
+        );
       } while (this.match(TokenType.COMMA));
     }
 
@@ -224,6 +275,8 @@ export class Parser {
       if (expr instanceof Variable) {
         const name = expr.name;
         return new Assign(name, value);
+      } else if (expr instanceof Get) {
+        return new Set(expr.object, expr.name, value);
       }
 
       this.error(equals, "Invalid assignment target.");
@@ -327,6 +380,12 @@ export class Parser {
     while (true) {
       if (this.match(TokenType.LEFT_PAREN)) {
         expr = this.finishCall(expr);
+      } else if (this.match(TokenType.DOT)) {
+        const name = this.consume(
+          TokenType.IDENTIFIER,
+          "Expect property name after '.'."
+        );
+        expr = new Get(expr, name);
       } else {
         break;
       }
@@ -353,7 +412,7 @@ export class Parser {
 
     return new Call(callee, paren, args);
   }
-  
+
   private primary(): Expr {
     if (this.match(TokenType.FALSE)) {
       return new Literal(false);
@@ -369,10 +428,21 @@ export class Parser {
       return new Literal(this.previous().literal);
     }
 
+    if (this.match(TokenType.SUPER)) {
+        const keyword = this.previous();
+        this.consume(TokenType.DOT, "Expect '.' after 'super'.");
+        const method = this.consume(TokenType.IDENTIFIER, "Expect superclass method name.");
+        return new Super(keyword, method);
+    }
+    
+    if (this.match(TokenType.THIS)) {
+      return new This(this.previous());
+    }
+
     if (this.match(TokenType.IDENTIFIER)) {
       return new Variable(this.previous());
     }
-    
+
     if (this.match(TokenType.LEFT_PAREN)) {
       const expr = this.expression();
       this.consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
@@ -415,7 +485,7 @@ export class Parser {
   }
 
   private error(token: Token, message: string): ParseError {
-    error(token, message);
+    Lox.error(token, message);
     return new ParseError(`${message} at ${token.toString()}`);
   }
 

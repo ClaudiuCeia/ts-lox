@@ -1,6 +1,7 @@
 import { Environment } from "./Environment.ts";
 import { Interpreter, ReturnException } from "./Interpreter.ts";
-import { Func } from "./Stmt.ts";
+import { LoxInstance } from "./LoxInstance.ts";
+import { Func } from "./generated/Stmt.ts";
 
 export abstract class LoxCallable {
   abstract arity: number;
@@ -11,10 +12,10 @@ export abstract class LoxCallable {
 export class LoxFunction extends LoxCallable {
   constructor(
     private readonly declaration: Func,
-    private readonly closure: Environment
+    private readonly closure: Environment,
+    private readonly isInitializer: boolean
   ) {
     super();
-    this.declaration = declaration;
   }
 
   get arity(): number {
@@ -31,11 +32,24 @@ export class LoxFunction extends LoxCallable {
       interpreter.executeBlock(this.declaration.body, environment);
     } catch (error) {
       if (error instanceof ReturnException) {
+        if (this.isInitializer) {
+          return this.closure.getAt(0, "this");
+        }
         return error.value;
       }
     }
 
+    if (this.isInitializer) {
+      return this.closure.getAt(0, "this");
+    }
+
     return null;
+  }
+
+  public bind(instance: LoxInstance): LoxFunction {
+    const environment = new Environment(this.closure);
+    environment.define("this", instance);
+    return new LoxFunction(this.declaration, environment, this.isInitializer);
   }
 
   public toString(): string {
