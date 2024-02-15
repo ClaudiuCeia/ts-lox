@@ -18,3 +18,17 @@ class BostonCream < Doughnut {
  // irrelevant
  */
 BostonCream().cook();
+
+var a = 1, b = 2, c = 20, d = 4 * 5 + 6;
+print a + b * c + d;
+
+var jj = 10;
+for (var i = 0; i < 10; i = i + 1, jj = jj - 1) {
+  print jj;
+}
+
+jj = 10, a = 0;
+while (jj > 0) {
+  a = a + 1;
+  jj = jj - 1;
+}

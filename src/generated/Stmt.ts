@@ -15,6 +15,7 @@ export interface StmtVisitor<R> {
   visitPrintStmt(stmt: Print): R;
   visitReturnStmt(stmt: Return): R;
   visitVarStmt(stmt: Var): R;
+  visitVarListStmt(stmt: VarList): R;
   visitWhileStmt(stmt: While): R;
 }
 export class Block extends Stmt {
@@ -134,6 +135,19 @@ export class Var extends Stmt {
 
     public accept<R>(visitor: StmtVisitor<R>): R {
       return visitor.visitVarStmt(this);
+    }
+  }
+
+export class VarList extends Stmt {
+    readonly list: Var[];
+
+    constructor(list: Var[]) {
+      super();
+      this.list = list;
+    }
+
+    public accept<R>(visitor: StmtVisitor<R>): R {
+      return visitor.visitVarListStmt(this);
     }
   }
 

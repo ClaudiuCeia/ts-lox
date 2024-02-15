@@ -6,6 +6,7 @@ export abstract class Expr {
   abstract accept<R>(visitor: ExprVisitor<R>): R;
 }
 export interface ExprVisitor<R> {
+  visitCommaSeparatedExpr(expr: CommaSeparated): R;
   visitAssignExpr(expr: Assign): R;
   visitBinaryExpr(expr: Binary): R;
   visitCallExpr(expr: Call): R;
@@ -19,6 +20,19 @@ export interface ExprVisitor<R> {
   visitUnaryExpr(expr: Unary): R;
   visitVariableExpr(expr: Variable): R;
 }
+export class CommaSeparated extends Expr {
+    readonly expressions: Expr[];
+
+    constructor(expressions: Expr[]) {
+      super();
+      this.expressions = expressions;
+    }
+
+    public accept<R>(visitor: ExprVisitor<R>): R {
+      return visitor.visitCommaSeparatedExpr(this);
+    }
+  }
+
 export class Assign extends Expr {
     readonly name: Token;
     readonly value: Expr;

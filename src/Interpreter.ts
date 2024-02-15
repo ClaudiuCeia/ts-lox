@@ -10,6 +10,7 @@ import {
   Unary,
   ExprVisitor,
   Variable,
+  CommaSeparated,
   Assign,
   Logical,
   Call,
@@ -32,6 +33,7 @@ import {
   Stmt,
   StmtVisitor,
   Var,
+  VarList,
   While,
 } from "./generated/Stmt.ts";
 
@@ -289,6 +291,20 @@ export class Interpreter implements ExprVisitor<unknown>, StmtVisitor<void> {
     }
 
     this.environment.define(stmt.name.lexeme, value);
+  }
+
+  public visitVarListStmt(stmt: VarList): void {
+    for (const variable of stmt.list) {
+      this.visitVarStmt(variable);
+    }
+  }
+
+  public visitCommaSeparatedExpr(expr: CommaSeparated): unknown {
+    for (const expression of expr.expressions) {
+      this.evaluate(expression);
+    }
+
+    return null;
   }
 
   public visitAssignExpr(expr: Assign): unknown {

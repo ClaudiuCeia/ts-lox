@@ -5,6 +5,7 @@ import {
   Assign,
   Binary,
   Call,
+  CommaSeparated,
   Expr,
   ExprVisitor,
   Get,
@@ -29,6 +30,7 @@ import {
   Stmt,
   StmtVisitor,
   Var,
+  VarList,
   While,
 } from "./generated/Stmt.ts";
 
@@ -150,6 +152,22 @@ export class Resolver implements ExprVisitor<void>, StmtVisitor<void> {
     this.define(stmt.name);
   }
 
+  public visitVarListStmt(stmt: VarList): void {
+    for (const varStmt of stmt.list) {
+      this.declare(varStmt.name);
+      if (varStmt.initializer !== null) {
+        this.resolve(varStmt.initializer);
+      }
+      this.define(varStmt.name);
+    }
+  }
+
+  public visitCommaSeparatedExpr(expr: CommaSeparated): void {
+    for (const expression of expr.expressions) {
+      this.resolve(expression);
+    }
+  }
+  
   public visitAssignExpr(expr: Assign): void {
     this.resolve(expr.value);
     this.resolveLocal(expr, expr.name);

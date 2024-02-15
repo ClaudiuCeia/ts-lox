@@ -26,8 +26,10 @@ import {
   Return,
   Stmt,
   Var,
+  VarList,
   While,
 } from "./generated/Stmt.ts";
+import { CommaSeparated } from "./generated/Expr.ts";
 
 class ParseError extends Error {}
 
@@ -102,6 +104,28 @@ export class Parser {
       initializer = this.expression();
     }
 
+    if (this.check(TokenType.COMMA)) {
+      const vars = [new Var(name, initializer)];
+
+      while (this.match(TokenType.COMMA)) {
+        const name = this.consume(
+          TokenType.IDENTIFIER,
+          "Expect variable name."
+        );
+        let initializer = null;
+        if (this.match(TokenType.EQUAL)) {
+          initializer = this.expression();
+        }
+        vars.push(new Var(name, initializer));
+      }
+
+      this.consume(
+        TokenType.SEMICOLON,
+        "Expect ';' after variable list declaration."
+      );
+      return new VarList(vars);
+    }
+
     this.consume(TokenType.SEMICOLON, "Expect ';' after variable declaration.");
     return new Var(name, initializer);
   }
@@ -161,6 +185,7 @@ export class Parser {
     if (this.match(TokenType.SEMICOLON)) {
       initializer = null;
     } else if (this.match(TokenType.VAR)) {
+      // Todo: Should be a var list, maybe
       initializer = this.varDeclaration();
     } else {
       initializer = this.expressionStatement();
@@ -174,14 +199,18 @@ export class Parser {
 
     let increment = null;
     if (!this.check(TokenType.RIGHT_PAREN)) {
-      increment = this.expression();
+      increment = this.commaSeparated();
+      // increment = this.expression()
     }
     this.consume(TokenType.RIGHT_PAREN, "Expect ')' after for clauses.");
 
     let body = this.statement();
 
     if (increment !== null) {
-      body = new Block([body, new Expression(increment)]);
+      body = new Block([
+        body,
+        /* new Expression(increment) */ new Expression(increment),
+      ]);
     }
 
     if (condition === null) {
@@ -207,6 +236,9 @@ export class Parser {
 
   private expressionStatement(): Stmt {
     const expr = this.expression();
+    if (this.check(TokenType.COMMA)) {
+      return new Expression(this.commaSeparated());
+    }
     this.consume(TokenType.SEMICOLON, "Expect ';' after expression.");
     return new Expression(expr);
   }
@@ -259,6 +291,15 @@ export class Parser {
 
     this.consume(TokenType.RIGHT_BRACE, "Expect '}' after block.");
     return statements;
+  }
+
+  private commaSeparated(): Expr {
+    const exprs = [];
+    do {
+      exprs.push(this.expression());
+    } while (this.match(TokenType.COMMA));
+
+    return new CommaSeparated(exprs);
   }
 
   private expression(): Expr {
@@ -429,12 +470,15 @@ export class Parser {
     }
 
     if (this.match(TokenType.SUPER)) {
-        const keyword = this.previous();
-        this.consume(TokenType.DOT, "Expect '.' after 'super'.");
-        const method = this.consume(TokenType.IDENTIFIER, "Expect superclass method name.");
-        return new Super(keyword, method);
+      const keyword = this.previous();
+      this.consume(TokenType.DOT, "Expect '.' after 'super'.");
+      const method = this.consume(
+        TokenType.IDENTIFIER,
+        "Expect superclass method name."
+      );
+      return new Super(keyword, method);
     }
-    
+
     if (this.match(TokenType.THIS)) {
       return new This(this.previous());
     }
